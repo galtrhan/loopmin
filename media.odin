@@ -113,8 +113,9 @@ export_clip :: proc(
 	start, length: f64,
 	frames: int,
 	stream_copy, with_audio: bool,
+	scale_width, scale_height: int,
 ) -> bool {
-	command := make([dynamic]string, 0, 24)
+	command := make([dynamic]string, 0, 28)
 	defer delete(command)
 
 	append(&command, "ffmpeg", "-v", "error", "-nostdin", "-y")
@@ -128,6 +129,16 @@ export_clip :: proc(
 	} else {
 		// Frame accurate: exactly `frames` frames starting at `start`.
 		append(&command, "-frames:v", fmt.aprintf("%d", frames))
+		if scale_width > 0 {
+			filter: string
+			if scale_height > 0 {
+				filter = fmt.aprintf("scale=%d:%d", scale_width, scale_height)
+			} else {
+				// -2 keeps aspect and makes height even for yuv420p.
+				filter = fmt.aprintf("scale=%d:-2", scale_width)
+			}
+			append(&command, "-vf", filter)
+		}
 		append(&command, "-c:v", "libx264", "-crf", "18", "-preset", "medium")
 	}
 	if !with_audio {

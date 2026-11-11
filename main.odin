@@ -28,6 +28,7 @@ options:
                          (1 - NCC); 0 disables (default 0.00001)
       --verify <WxH>     re-score the winning pair at this size; "off" skips
                          (default 128x72)
+      --scale <W|WxH>    scale the exported file; width alone keeps aspect
       --no-export        report only, write no file
       --copy             stream copy instead of re-encoding (keyframe accurate)
       --with-audio       keep audio (dropped by default)
@@ -48,6 +49,8 @@ Options :: struct {
 	verify:       bool,
 	verify_width: int,
 	verify_height: int,
+	scale_width:  int,
+	scale_height: int,
 	output:       string,
 	export:       bool,
 	copy:         bool,
@@ -158,7 +161,17 @@ main :: proc() {
 	if out == "" {
 		out = default_output(opts.input)
 	}
-	if !export_clip(opts.input, out, start_s, length, frames, opts.copy, opts.with_audio) {
+	if !export_clip(
+		opts.input,
+		out,
+		start_s,
+		length,
+		frames,
+		opts.copy,
+		opts.with_audio,
+		opts.scale_width,
+		opts.scale_height,
+	) {
 		os.exit(1)
 	}
 	fmt.printfln("wrote %s", out)
@@ -256,6 +269,17 @@ parse_args :: proc(argv: []string) -> (opts: Options, ok: bool) {
 				return {}, false
 			}
 			opts.min_motion = f32(number)
+		case "--scale":
+			value, got := next_value(argv, &i)
+			if !got {
+				return {}, false
+			}
+			w, h, scaled := parse_scale(value)
+			if !scaled {
+				return {}, false
+			}
+			opts.scale_width = w
+			opts.scale_height = h
 		case:
 			fmt.eprintfln("loopmin: unknown option %s", arg)
 			return {}, false
@@ -300,6 +324,10 @@ parse_args :: proc(argv: []string) -> (opts: Options, ok: bool) {
 		fmt.eprintln("loopmin: stride must be >= 1 and min-motion in [0, 1]")
 		return {}, false
 	}
+	if opts.copy && opts.scale_width > 0 {
+		fmt.eprintln("loopmin: --scale needs re-encoding; drop --copy")
+		return {}, false
+	}
 
 	return opts, true
 }
@@ -323,6 +351,18 @@ parse_size :: proc(s: string) -> (w, h: int, ok: bool) {
 		return 0, 0, false
 	}
 	return width, height, true
+}
+
+// Width alone keeps aspect (height 0). WxH sets both.
+parse_scale :: proc(s: string) -> (w, h: int, ok: bool) {
+	if strings.index_byte(s, 'x') >= 0 {
+		return parse_size(s)
+	}
+	width, parsed := strconv.parse_int(s)
+	if !parsed || width < 2 {
+		return 0, 0, false
+	}
+	return width, 0, true
 }
 
 default_output :: proc(input: string) -> string {

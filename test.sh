@@ -32,6 +32,13 @@ grep -Eq "\(3\.(8|9)[0-9]{2}s" <<<"$output" || fail "expected a loop just under 
 frames=$(ffprobe -v error -select_streams v:0 -show_entries stream=nb_frames -of default=nw=1:nk=1 loop.mp4)
 [ "$frames" = "120" ] || fail "expected 120 exported frames, got $frames"
 
+# --scale sets the export width and keeps aspect.
+"$here/loopmin" fixture.mp4 2 99 0 -o scaled.mp4 --scale 160 >/dev/null
+width=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of default=nw=1:nk=1 scaled.mp4)
+height=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of default=nw=1:nk=1 scaled.mp4)
+[ "$width" = "160" ] || fail "expected scaled width 160, got $width"
+[ "$height" = "90" ] || fail "expected scaled height 90, got $height"
+
 # A static clip has nothing to loop back from once the motion guard is on.
 ffmpeg -v error -y -f lavfi -i "color=c=red:s=160x90:r=25:d=5" -c:v libx264 -pix_fmt yuv420p static.mp4
 if "$here/loopmin" static.mp4 2 95 --no-export >/dev/null 2>&1; then

@@ -24,6 +24,10 @@ Candle clip, shortest loop at least 10 seconds at 95% similarity:
 
 [`docs/demo-loop.mp4`](docs/demo-loop.mp4) is the same cut at 960x540.
 
+`--scale 460` next to that cut:
+
+![Source 960x540 beside --scale 460](docs/demo-scale.gif)
+
 Source video by [jrydertr](https://pixabay.com/users/jrydertr-29142268/) from
 [Pixabay](https://pixabay.com/videos/candlelight-candle-flame-light-123824/)
 (Content License). Demo files live in `docs/`.
@@ -83,6 +87,7 @@ loopmin <input> <min-duration> <similarity> [start] [options]
 | `--stride` | `1` | analyze every nth frame |
 | `--min-motion` | `0.00001` | reject frozen holds; mean successive (1 - NCC) must clear this; `0` disables |
 | `--verify` | `128x72` | re-score size; `off` skips the check |
+| `--scale` | source size | export width, or `WxH`; width alone keeps aspect |
 | `--no-export` | | report only |
 | `--copy` | | stream copy instead of re-encoding |
 | `--with-audio` | | keep audio |
@@ -101,6 +106,9 @@ loopmin drone.mp4 2 95 --no-export
 
 # long video, check every third frame
 loopmin talk.mp4 5 90 --stride 3
+
+# export at 460px wide, height follows aspect
+loopmin clip.mp4 10 95 --scale 460 -o loop-460.mp4
 ```
 
 ## What it does not do
@@ -118,7 +126,8 @@ is less wrong than a stutter.
 
 `--copy` avoids re-encoding but snaps to the previous keyframe, so the exported
 length can differ from the reported one. The default re-encodes with libx264 CRF 18
-for a frame-exact cut.
+for a frame-exact cut. `--scale` needs that re-encode, so it cannot combine with
+`--copy`.
 
 Variable frame rate videos use the average frame rate, so timestamps can drift
 slightly on those.
