@@ -115,3 +115,9 @@ Odin has no video decoder in its standard library, and linking libav* would trip
 the code for no gain here. The interesting part is the search, and ffmpeg already
 does decode and encode well. The program shells out with an argument slice, no shell
 involved, so filenames with spaces are fine.
+
+## License
+
+MIT. Redistributing it, modified or not, means keeping the copyright notice and
+the permission notice in the source. See `LICENSE`.
+
