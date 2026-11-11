@@ -17,12 +17,14 @@ wrote clip-loop.mp4
 
 ## Demo
 
-Candle clip, shortest loop at least 2 seconds at 95% similarity:
-`15.000s -> 17.000s` (50 frames, 99.99%).
+Candle clip, shortest loop at least 10 seconds at 95% similarity:
+`16.960s -> 26.960s` (250 frames, 99.99%).
 
-![Looping candle flame](docs/demo-loop.gif)
+<video src="docs/demo-loop.mp4" width="720" controls autoplay muted loop playsinline>
+  <img src="docs/demo-loop.gif" alt="Looping candle flame" width="720">
+</video>
 
-[`docs/demo-loop.mp4`](docs/demo-loop.mp4) is the same cut at 960x540.
+[GIF fallback](docs/demo-loop.gif) · [`demo-loop.mp4`](docs/demo-loop.mp4)
 
 Source video by [jrydertr](https://pixabay.com/users/jrydertr-29142268/) from
 [Pixabay](https://pixabay.com/videos/candlelight-candle-flame-light-123824/)
