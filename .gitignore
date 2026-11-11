@@ -2,3 +2,5 @@
 *.mp4
 *.png
 *.raw
+!docs/
+!docs/**

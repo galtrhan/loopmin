@@ -24,8 +24,8 @@ options:
       --max-duration <s> longest loop to consider (default: end of video)
       --size <WxH>       descriptor size (default 32x18)
       --stride <n>       analyze every nth frame (default 1)
-      --min-motion <f>   require the segment to move away from its first frame
-                         before coming back; 0 disables (default 0.5)
+      --min-motion <f>   minimum mean frame-to-frame change inside the loop
+                         (1 - NCC); 0 disables (default 0.00001)
       --verify <WxH>     re-score the winning pair at this size; "off" skips
                          (default 128x72)
       --no-export        report only, write no file
@@ -87,10 +87,14 @@ main :: proc() {
 		n,
 	)
 
+	// One slab of descriptors keeps the pairwise scan sequential in memory.
+	dim := frame_bytes
+	slab := make([]f32, n * dim)
 	m := make([]Descriptor, n)
 	for i in 0 ..< n {
 		source := i * opts.stride
-		m[i] = build_descriptor(raw[source*frame_bytes:(source + 1)*frame_bytes])
+		m[i] = slab[i * dim:(i + 1) * dim]
+		fill_descriptor(raw[source * frame_bytes:(source + 1) * frame_bytes], m[i])
 	}
 
 	params := Scan_Params {
@@ -113,7 +117,7 @@ main :: proc() {
 		width      = opts.verify_width,
 		height     = opts.verify_height,
 		threshold  = params.threshold,
-		max_checks = 32,
+		max_checks = DEFAULT_VERIFY_CHECKS,
 		enabled    = opts.verify,
 	}
 
@@ -164,7 +168,7 @@ parse_args :: proc(argv: []string) -> (opts: Options, ok: bool) {
 	opts.width = 32
 	opts.height = 18
 	opts.stride = 1
-	opts.min_motion = 0.5
+	opts.min_motion = DEFAULT_MIN_MOTION
 	opts.verify = true
 	opts.verify_width = 128
 	opts.verify_height = 72

@@ -35,7 +35,7 @@ frames=$(ffprobe -v error -select_streams v:0 -show_entries stream=nb_frames -of
 # A static clip has nothing to loop back from once the motion guard is on.
 ffmpeg -v error -y -f lavfi -i "color=c=red:s=160x90:r=25:d=5" -c:v libx264 -pix_fmt yuv420p static.mp4
 if "$here/loopmin" static.mp4 2 95 --no-export >/dev/null 2>&1; then
-	fail "static clip should not report a loop with --min-motion 0.5"
+	fail "static clip should not report a loop with default --min-motion"
 fi
 
 echo "ok"

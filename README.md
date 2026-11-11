@@ -15,6 +15,19 @@ searched 360 frames in 0.34s
 wrote clip-loop.mp4
 ```
 
+## Demo
+
+Candle clip, shortest loop at least 2 seconds at 95% similarity:
+`15.000s -> 17.000s` (50 frames, 99.99%).
+
+![Looping candle flame](docs/demo-loop.gif)
+
+[`docs/demo-loop.mp4`](docs/demo-loop.mp4) is the same cut at 960x540.
+
+Source video by [jrydertr](https://pixabay.com/users/jrydertr-29142268/) from
+[Pixabay](https://pixabay.com/videos/candlelight-candle-flame-light-123824/)
+(Content License). Demo files live in `docs/`.
+
 ## How it works
 
 1. `ffmpeg` decodes every frame once to a 32x18 grayscale raw stream.
@@ -35,10 +48,12 @@ to trade precision for speed on long videos.
 
 ## Build
 
-Needs Odin and ffmpeg on `PATH`.
+Needs [Odin](https://odin-lang.org/) and `ffmpeg` / `ffprobe` on `PATH`.
 
 ```
 make
+make test
+make install   # optional, PREFIX=/usr/local
 ```
 
 or
@@ -66,7 +81,7 @@ loopmin <input> <min-duration> <similarity> [start] [options]
 | `--max-duration` | whole video | longest loop to consider |
 | `--size` | `32x18` | descriptor size for the scan |
 | `--stride` | `1` | analyze every nth frame |
-| `--min-motion` | `0.5` | reject segments that never leave their first frame; `0` disables |
+| `--min-motion` | `0.00001` | reject frozen holds; mean successive (1 - NCC) must clear this; `0` disables |
 | `--verify` | `128x72` | re-score size; `off` skips the check |
 | `--no-export` | | report only |
 | `--copy` | | stream copy instead of re-encoding |
@@ -95,9 +110,8 @@ dominates the score. A small moving object can jump while the number stays high.
 that matters, raise `--verify` to something like `320x180` and lower the threshold
 until the seams look right.
 
-`--min-motion` exists because a held camera "loops" instantly and uselessly. It
-samples the segment and requires at least one frame to fall below the given
-similarity to the start frame. Turn it off for loops with very little motion.
+`--min-motion` rejects frozen holds. It is the minimum mean successive-frame
+change (1 - NCC) inside the candidate. Use `0` to allow holds.
 
 Audio is dropped by default. A loop usually cuts mid-word or mid-beat, and silence
 is less wrong than a stutter.
@@ -115,6 +129,12 @@ Odin has no video decoder in its standard library, and linking libav* would trip
 the code for no gain here. The interesting part is the search, and ffmpeg already
 does decode and encode well. The program shells out with an argument slice, no shell
 involved, so filenames with spaces are fine.
+
+## Test media
+
+`make test` builds a synthetic rotating fixture. Manual checks use a local
+`sample.mp4` download of the Pixabay candle clip above. Root-level media stays
+gitignored. Files under `docs/` are tracked.
 
 ## License
 

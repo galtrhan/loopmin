@@ -38,10 +38,15 @@ Verifier :: struct {
 }
 
 MOTION_SAMPLES :: 48
+DEFAULT_MIN_MOTION :: f32(0.00001)
+DEFAULT_VERIFY_CHECKS :: 128
 
-build_descriptor :: proc(pixels: []u8) -> Descriptor {
+// Writes a mean-centered unit descriptor into `d`. `d` must be the same
+// length as `pixels`. Callers keep descriptors in one contiguous slab so the
+// O(n²) scan stays in cache.
+fill_descriptor :: proc(pixels: []u8, d: Descriptor) {
 	n := len(pixels)
-	d := make(Descriptor, n)
+	assert(len(d) == n)
 
 	mean: f32
 	for p in pixels {
@@ -73,6 +78,11 @@ build_descriptor :: proc(pixels: []u8) -> Descriptor {
 			d[i] = value
 		}
 	}
+}
+
+build_descriptor :: proc(pixels: []u8) -> Descriptor {
+	d := make(Descriptor, len(pixels))
+	fill_descriptor(pixels, d)
 	return d
 }
 
@@ -86,9 +96,8 @@ dot :: proc(a, b: Descriptor) -> f32 {
 	return score
 }
 
-// True when the segment leaves the neighborhood of its first frame at some
-// point. Without this a static shot "loops" instantly, which is technically
-// correct and practically useless.
+// Held frames score a perfect loop at any length. Require mean successive
+// (1 - NCC) along the segment to clear min_motion; 0 disables the guard.
 motion_ok :: proc(m: []Descriptor, first, last: int, min_motion: f32) -> bool {
 	if min_motion <= 0 {
 		return true
@@ -101,9 +110,13 @@ motion_ok :: proc(m: []Descriptor, first, last: int, min_motion: f32) -> bool {
 	if span < steps {
 		steps = span
 	}
-	for s in 1 ..< steps {
-		sample := first + span*s/steps
-		if dot(m[first], m[sample]) < min_motion {
+	need := min_motion * f32(steps)
+	total: f32
+	for s in 0 ..< steps {
+		i := first + span*s/steps
+		j := first + span*(s + 1)/steps
+		total += 1 - dot(m[i], m[j])
+		if total >= need {
 			return true
 		}
 	}
@@ -151,10 +164,9 @@ find_loop :: proc(m: []Descriptor, p: Scan_Params, verifier: ^Verifier) -> (Loop
 		return {}, false
 	}
 
+	// Prefer the top-scoring pair (one motion check). Only if that stretch is
+	// frozen do we rescan for the best pair that clears the motion guard.
 	for gap in min_gap ..= max_gap {
-		if gap >= n {
-			break
-		}
 		best_first := -1
 		best_score: f32 = -2
 		for first in 0 ..< n - gap {
@@ -167,27 +179,50 @@ find_loop :: proc(m: []Descriptor, p: Scan_Params, verifier: ^Verifier) -> (Loop
 		if best_first < 0 || best_score < p.threshold {
 			continue
 		}
-		if !motion_ok(m, best_first, best_first + gap, p.min_motion) {
+		if motion_ok(m, best_first, best_first + gap, p.min_motion) {
+			if passes(verifier, best_first, best_first + gap) {
+				return Loop{best_first, best_first + gap, best_score}, true
+			}
 			continue
 		}
-		if !passes(verifier, best_first, best_first + gap) {
+
+		alt_first := -1
+		alt_score: f32
+		for first in 0 ..< n - gap {
+			if first == best_first {
+				continue
+			}
+			score := dot(m[first], m[first + gap])
+			if score < p.threshold {
+				continue
+			}
+			if alt_first >= 0 && score <= alt_score {
+				continue
+			}
+			if !motion_ok(m, first, first + gap, p.min_motion) {
+				continue
+			}
+			alt_score = score
+			alt_first = first
+		}
+		if alt_first < 0 {
 			continue
 		}
-		return Loop{best_first, best_first + gap, best_score}, true
+		if passes(verifier, alt_first, alt_first + gap) {
+			return Loop{alt_first, alt_first + gap, alt_score}, true
+		}
 	}
 
 	return {}, false
 }
 
-// Re-scores a candidate at full descriptor size. A nil or disabled verifier
-// accepts everything. The check budget stops a pathological video from
-// spawning thousands of ffmpeg runs.
+// Re-score at verify size. Disabled verifier accepts. Spent check budget rejects.
 passes :: proc(v: ^Verifier, first, last: int) -> bool {
 	if v == nil || !v.enabled {
 		return true
 	}
 	if v.checks >= v.max_checks {
-		return true
+		return false
 	}
 	v.checks += 1
 	return verify_candidate(v, first, last)
